@@ -1,94 +1,61 @@
-import tkinter as tk
-import requests
 import phonenumbers
-from phonenumbers import geocoder, carrier
+import requests
 from bs4 import BeautifulSoup
-import json
+from tkinter import *
 
-# Fetch phone number details using Truecaller API
-def fetch_truecaller_details(phone_number):
-    url = "https://www.truecaller.com/search/in/" + phone_number
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+def fetch_details():
+    # get phone number from input field
+    phone_number = phone_number_input.get()
 
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, "html.parser")
-        scripts = soup.find_all("script", type="text/javascript")
-        for script in scripts:
-            if "app\.config" in script.text:
-                data = script.text.split("window\.app\.config = ")[1].rsplit(";", 1)[0]
-                json_data = json.loads(data)
-                return json_data.get("data", {})
-    
-    return {}
-
-# Fetch phone number details using phonenumbers library
-def fetch_phone_details(phone_number):
-    details = {}
-
+    # validate phone number
     try:
-        parsed_number = phonenumbers.parse(phone_number, "IN")
-        
-        if phonenumbers.is_valid_number(parsed_number):
-            details["country_code"] = phonenumbers.region_code_for_number(parsed_number)
-            details["location"] = geocoder.description_for_number(parsed_number, "en")
-            details["carrier"] = carrier.name_for_number(parsed_number, "en")
-        else:
-            details["error"] = "Invalid phone number."
-    
-    except phonenumbers.phonenumberutil.NumberParseException as e:
-        details["error"] = str(e)
-    
-    return details
+        parsed_number = phonenumbers.parse(phone_number, None)
+        if not phonenumbers.is_valid_number(parsed_number):
+            result_text.delete('1.0', END)
+            result_text.insert(END, "Invalid phone number.")
+            return
+    except phonenumbers.phonenumberutil.NumberParseException:
+        result_text.delete('1.0', END)
+        result_text.insert(END, "Invalid phone number.")
+        return
 
-def track_location():
-    phone_number = phone_entry.get()
+    # fetch carrier details
+    url = f'https://www.carrierlookup.com/index.php/api/lookup?api_key=YOUR_API_KEY&number={phone_number}'
+    response = requests.get(url)
+    carrier_details = response.json()
 
-    truecaller_details = fetch_truecaller_details(phone_number)
-    phone_details = fetch_phone_details(phone_number)
+    # fetch location details
+    url = f'https://www.numberlookup.com/{phone_number}'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    location_details = soup.find_all('div', {'class': 'detail-row'})[0].find('p').text
 
-    location = truecaller_details.get('location') or phone_details.get('location')
-    location_label.config(text="Current Location: " + location)
+    # fetch social media profiles
+    # replace the following code with your actual implementation to fetch social media profiles
+    social_media_profiles = [
+        {
+            'name': 'John Doe',
+            'platform': 'Twitter',
+            'link': 'https://twitter.com/johndoe'
+        },
+        {
+            'name': 'John Doe',
+            'platform': 'Facebook',
+            'link': 'https://facebook.com/johndoe'
+        },
+        {
+            'name': 'John Doe',
+            'platform': 'Instagram',
+            'link': 'https://instagram.com/johndoe'
+        }
+    ]
 
-def fetch_social_media_profiles():
-    phone_number = phone_entry.get()
-
-    # Implement social media profile fetching here
-    # Use appropriate APIs or techniques to retrieve social media profiles based on the phone number
-    # Extract relevant information such as names, usernames, profile pictures, etc.
-    # Display the profiles in the result_text box
-
-    result_text.delete(1.0, tk.END)
-    result_text.insert(tk.END, "Social Media Profiles:\n")
-    result_text.insert(tk.END, "Profile 1\n")
-    result_text.insert(tk.END, "Profile 2\n")
-    result_text.insert(tk.END, "Profile 3\n")
-    # Add more profiles as needed
-
-# GUI Setup
-window = tk.Tk()
-window.title("Phone Number Details")
-window.geometry("400x400")
-
-phone_label = tk.Label(window, text="Enter Phone Number:")
-phone_label.pack()
-
-phone_entry = tk.Entry(window)
-phone_entry.pack()
-
-fetch_button = tk.Button(window, text="Fetch Details", command=track_location)
-fetch_button.pack()
-
-social_media_button = tk.Button(window, text="Fetch Social Media Profiles", command=fetch_social_media_profiles)
-social_media_button.pack()
-
-result_text = tk.Text(window, height=10, width=40)
-result_text.pack()
-
-location_label = tk.Label(window, text="Current Location: ")
-location_label.pack()
-
-window.mainloop()
+    # display the results
+    result_text.delete('1.0', END)
+    result_text.insert(END, f"Phone number: {phone_number}\n\n")
+    result_text.insert(END, f"Carrier: {carrier_details['carrier']}\n")
+    result_text.insert(END, f"Line type: {carrier_details['linetype']}\n\n")
+    result_text.insert(END, f"Location: {location_details}\n\n")
+    result_text.insert(END, "Social media profiles:\n")
+    for profile in social_media_profiles:
+        result_text.insert(END, f"{profile['name']} - {profile['platform']}: {profile['link']}\n")
